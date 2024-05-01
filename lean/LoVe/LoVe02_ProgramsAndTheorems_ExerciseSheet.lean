@@ -22,8 +22,9 @@ its argument, or 0 if the argument is 0. For example:
     `pred 7 = 6`
     `pred 0 = 0` -/
 
-def pred : ℕ → ℕ :=
-  sorry
+def pred : ℕ → ℕ
+  | Nat.zero => Nat.zero
+  | Nat.succ n => n
 
 /- 1.2. Check that your function works as expected. -/
 
@@ -61,7 +62,12 @@ def someEnv : String → ℤ
   | _   => 201
 
 #eval eval someEnv (AExp.var "x")   -- expected: 3
--- invoke `#eval` here
+#eval eval someEnv (AExp.num 15)   -- expected: 15
+#eval eval someEnv (AExp.add (AExp.num 3) (AExp.var "y"))   -- expected: 20
+#eval eval someEnv (AExp.sub (AExp.num 202) (AExp.var "z"))   -- expected: 1
+#eval eval someEnv (AExp.mul (AExp.var "x") (AExp.var "y"))   -- expected: 51
+#eval eval someEnv (AExp.div (AExp.num 10) (AExp.num 2))   -- expected: 5
+#eval eval someEnv (AExp.div (AExp.num 10) (AExp.num 0))   -- expected: 0?
 
 /- 2.2. The following function simplifies arithmetic expressions involving
 addition. It simplifies `0 + e` and `e + 0` to `e`. Complete the definition so
@@ -69,9 +75,19 @@ that it also simplifies expressions involving the other three binary
 operators. -/
 
 def simplify : AExp → AExp
+  -- addition with zero
   | AExp.add (AExp.num 0) e₂ => simplify e₂
   | AExp.add e₁ (AExp.num 0) => simplify e₁
-  -- insert the missing cases here
+  -- subtraction with zero
+  | AExp.sub e₁ (AExp.num 0) => simplify e₁
+  -- multiplication with zero
+  | AExp.mul (AExp.num 0) _e₂ => AExp.num 0
+  | AExp.mul _e₁ (AExp.num 0) => AExp.num 0
+  -- multiplication with one
+  | AExp.mul (AExp.num 1) e₂ => simplify e₂
+  | AExp.mul e₁ (AExp.num 1) => simplify e₁
+  -- division with one
+  | AExp.div e₁ (AExp.num 1) => simplify e₁
   -- catch-all cases below
   | AExp.num i               => AExp.num i
   | AExp.var x               => AExp.var x
@@ -90,7 +106,7 @@ the property that the value of `e` after simplification is the same as the
 value of `e` before. -/
 
 theorem simplify_correct (env : String → ℤ) (e : AExp) :
-  True :=   -- replace `True` by your theorem statement
+  eval env e = eval env (simplify e) :=   -- replace `True` by your theorem statement
   sorry   -- leave `sorry` alone
 
 
@@ -99,8 +115,9 @@ theorem simplify_correct (env : String → ℤ) (e : AExp) :
 3.1 (**optional**). Define a generic `map` function that applies a function to
 every element in a list. -/
 
-def map {α : Type} {β : Type} (f : α → β) : List α → List β :=
-  sorry
+def map {α : Type} {β : Type} (f : α → β) : List α → List β
+  | List.nil => List.nil
+  | List.cons head tail => List.cons (f head) (@map α β f tail) -- using explicit arguments for practice
 
 #eval map (fun n ↦ n + 10) [1, 2, 3]   -- expected: [11, 12, 13]
 
@@ -114,5 +131,13 @@ Try to give meaningful names to your theorems. Also, make sure to state the
 second property as generally as possible, for arbitrary types. -/
 
 -- enter your theorem statements here
+
+theorem identity (α : Type) (xs : List α) :
+  map (fun x ↦ x) xs = xs :=
+  sorry
+
+theorem composition (α : Type) (β : Type) (γ : Type) (f : α -> β) (g : β -> γ) (xs : List α) :
+  map (fun x ↦ g (f x)) xs = map g (map f xs) :=
+  sorry
 
 end LoVe
