@@ -189,9 +189,32 @@ axiom All.one_point_wrong {α : Type} (t : α) (P : α → Prop) :
 
 theorem All.proof_of_False :
   False :=
-  -- what am i supposed to do here?
-  -- how am i supposed to magically introduce All.one_point_wrong into this?
-  sorry
+  -- proof by counterexample
+  -- introduce P and backwards clause for one_point_wrong
+  let P (x: ℕ) := x = 0
+  let opw := All.one_point_wrong 0 P
+  let opwb := Iff.mpr opw
+  -- show that P 0 holds (obviously)
+  have p0 : P 0 :=
+    by
+      simp
+  -- show that the forall statement holds
+  have fa :=
+    opwb p0
+  -- show that the instance where x=3 holds, by universality
+  have fa3 :=
+    fa 3
+  -- show that this implies that 3 = 0
+  have three_eq_zero : 3 = 0 :=
+    And.left fa3
+  -- show that 3 = 0 is blatantly false
+  have three_eq_zero_wrong : 3 = 0 -> False :=
+    by
+      simp
+  -- qed
+  show _ from
+    three_eq_zero_wrong three_eq_zero
+
 
 /- 3.2 (**optional**). Prove that the following wrong formulation of the
 one-point rule for `∃` is inconsistent, using a structured proof. -/
@@ -201,6 +224,23 @@ axiom Exists.one_point_wrong {α : Type} (t : α) (P : α → Prop) :
 
 theorem Exists.proof_of_False :
   False :=
-  sorry
+  -- proof by counterexample
+  -- set up sample P and forward clause of one_point_wrong
+  let P (x: ℕ) := x = 0
+  let opw := Exists.one_point_wrong 3 P
+  let opwf := Iff.mp opw
+  -- show that P 3 holds
+  have p3 : P 3 :=
+    by
+      apply opwf
+      apply Exists.intro 2
+      simp
+  -- show that P 3 is false
+  have p3_wrong : P 3 -> False :=
+    by
+      simp
+  -- qed
+  show False from
+    p3_wrong p3
 
 end LoVe
