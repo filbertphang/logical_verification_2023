@@ -221,6 +221,9 @@ This is called __rule induction__, because the induction is on the introduction
 rules (i.e., the constructors of the proof term). Thanks to the PAT principle,
 this works as expected. -/
 
+-- this is another way to say:
+-- ∀ n ∈ ℕ, Even n → n % 2 = 0
+-- just that the (n : ℕ) and the (h : Even n) are written as params
 theorem mod_two_Eq_zero_of_Even (n : ℕ) (h : Even n) :
   n % 2 = 0 :=
   by
