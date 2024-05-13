@@ -135,23 +135,66 @@ theorems (e.g., `IsFull_mirror`, `mirror_mirror`). -/
 
 theorem mirror_IsFull {α : Type} :
   ∀t : BTree α, IsFull (mirror t) → IsFull t :=
-  sorry
+  fix t : BTree α
+  assume isf : IsFull (mirror t)
+  have isf_mm : IsFull (mirror (mirror t)) :=
+    IsFull_mirror (mirror t) isf
+  show IsFull t from
+    by
+      rw [mirror_mirror] at isf_mm
+      exact isf_mm
 
 /- 3.2. Define a `map` function on binary trees, similar to `List.map`. -/
 
-def BTree.map {α β : Type} (f : α → β) : BTree α → BTree β :=
-  sorry
+def BTree.map {α β : Type} (f : α → β) : BTree α → BTree β
+  | empty => BTree.empty
+  | node a l r => BTree.node (f a) (BTree.map f l) (BTree.map f r)
 
 /- 3.3. Prove the following theorem by case distinction. -/
 
+-- this one was pretty hard because i wasn't very aware of the
+-- tools i had on hand
+
 theorem BTree.map_eq_empty_iff {α β : Type} (f : α → β) :
   ∀t : BTree α, BTree.map f t = BTree.empty ↔ t = BTree.empty :=
-  sorry
+  by
+    intro t
+    apply Iff.intro
+
+    -- forward case
+    case mp =>
+      intro hmap_emp
+      cases t with
+        -- trivial case
+        | empty => rfl
+        -- impossible case, so we derive a contradiction
+        -- (if t is a node, then BTree.map should never return empty!)
+        | node a l r =>
+          apply False.elim
+          simp [BTree.map] at hmap_emp
+
+    -- backwards case
+    case mpr =>
+      intro t_emp
+      rw [t_emp]
+      rfl
 
 /- 3.4 (**optional**). Prove the following theorem by rule induction. -/
 
 theorem BTree.map_mirror {α β : Type} (f : α → β) :
   ∀t : BTree α, IsFull t → IsFull (BTree.map f t) :=
-  sorry
+  fix t : BTree α
+  assume h_isf_t : IsFull t
+  by
+    induction h_isf_t with
+      | empty =>
+        simp [map, IsFull.empty]
+      | node =>
+        rw [map]
+        apply IsFull.node
+        { exact hl_ih }
+        { exact hr_ih }
+        { simp [map_eq_empty_iff, *] }
+
 
 end LoVe
