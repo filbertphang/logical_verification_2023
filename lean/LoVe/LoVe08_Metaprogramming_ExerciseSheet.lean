@@ -24,9 +24,15 @@ namespace LoVe
 
 Recall from the lecture that `destruct_and` fails on easy goals such as -/
 
+-- a timely revision for forward proofs
 theorem abc_ac (a b c : Prop) (h : a ∧ b ∧ c) :
   a ∧ c :=
-  sorry
+  have a' : a :=
+    And.left h
+  have c' : c :=
+    And.right (And.right h)
+  show a ∧ c from
+    And.intro a' c'
 
 /- We will now address this by developing a new tactic called `destro_and`,
 which applies both **des**truction and in**tro**duction rules for conjunction.
@@ -40,6 +46,8 @@ conjunctions are gone. Define your tactic as a macro. -/
 #check repeat'
 
 -- enter your definition here
+macro "intro_and" : tactic =>
+  `(tactic| (repeat' apply And.intro))
 
 theorem abcd_bd (a b c d : Prop) (h : a ∧ (b ∧ c) ∧ d) :
   b ∧ d :=
@@ -112,7 +120,22 @@ Here is some pseudocode that you can follow:
 6. Return. -/
 
 partial def casesAnd : TacticM Unit :=
-  sorry
+  withMainContext (do
+    let lctx ← getLCtx
+    for ldecl in lctx do
+      if ! LocalDecl.isImplementationDetail ldecl then
+        -- convert local declaration to an expression,
+        -- before inferring its type
+        let ty ← inferType (LocalDecl.toExpr ldecl)
+        if (Expr.isAppOfArity ty ``And 2) then
+          -- case split and recurse
+          cases (LocalDecl.fvarId ldecl)
+          casesAnd
+          -- important to return here, so that we no longer try to case split
+          -- on hypotheses that no longer exist because they have already been split
+          -- in a previous recursive call
+          return
+  )
 
 elab "cases_and" : tactic =>
   casesAnd
@@ -138,7 +161,11 @@ theorem abcd_bd_again (a b c d : Prop) :
 directly by `assumption`. -/
 
 macro "destro_and" : tactic =>
-  sorry
+  `(tactic| (
+      cases_and
+      intro_and
+      repeat' hypothesis
+    ))
 
 theorem abcd_bd_over_again (a b c d : Prop) (h : a ∧ (b ∧ c) ∧ d) :
   b ∧ d :=
@@ -166,7 +193,13 @@ theorem abd_bacb_again (a b c d : Prop) (h : a ∧ b ∧ d) :
 it works as expected also on more complicated examples. -/
 
 -- enter your examples here
+theorem ac_from_ab_cd (a b c d : Prop) (h1: a ∧ b) (h2 : c ∧ d) :
+  a ∧ c :=
+  by destro_and
 
+theorem acf_from_ab_cd_ef (a b c d e f : Prop) (h1: a ∧ b) (h2 : c ∧ d) (h3 : e ∧ f) :
+  a ∧ (c ∧ f) :=
+  by destro_and
 
 /- ## Question 2 (**optional**): A Theorem Finder
 
@@ -184,7 +217,13 @@ Hints:
 * The "or" connective on `Bool` is called `||`, and equality is called `==`. -/
 
 def constInExpr (name : Name) (e : Expr) : Bool :=
-  sorry
+  match e with
+  | Expr.const cname _  => cname  == name
+  | Expr.app f args => constInExpr name f || constInExpr name args
+  | Expr.lam _ args body _ => constInExpr name args || constInExpr name body
+  | Expr.forallE _ domain result _ => constInExpr name domain || constInExpr name result
+  | Expr.letE _ type value b _ => constInExpr name type || constInExpr name value || constInExpr name b
+  | _ => false
 
 /- 2.2 (**optional**). Write a function that checks whether an expression
 contains **all** constants in a list.
@@ -192,7 +231,9 @@ contains **all** constants in a list.
 Hint: You can either proceed recursively or use `List.and` and `List.map`. -/
 
 def constsInExpr (names : List Name) (e : Expr) : Bool :=
-  sorry
+  match names with
+  | [] => true
+  | name :: remaining => constInExpr name e && constsInExpr remaining e
 
 /- 2.3 (**optional**). Develop a tactic that uses `constsInExpr` to print the
 name of all theorems that contain all constants `names` in their statement.
@@ -201,7 +242,15 @@ This code should be similar to that of `proveDirect` in the demo file. With
 `ConstantInfo.type`, you can extract the proposition associated with a theorem. -/
 
 def findConsts (names : List Name) : TacticM Unit :=
-  sorry
+  do
+    -- read environment and iterate over constants
+    let env ← getEnv
+    for (name, info) in SMap.toList (Environment.constants env) do
+      -- check if this constant refers to a (safe?) theorem
+      if isTheorem info && ! ConstantInfo.isUnsafe info then
+        -- check if theorem contains all target names
+        if constsInExpr names (ConstantInfo.type info) then
+          logInfo m!"{name}"
 
 elab "find_consts" "(" names:ident+ ")" : tactic =>
   findConsts (Array.toList (Array.map getId names))
