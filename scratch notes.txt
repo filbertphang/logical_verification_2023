@@ -1,0 +1,24 @@
+## inductively-defined propositions
+
+just like how an inductively-defined type has a base case and a constructor,
+and we can use this to uh
+define the elements that belong in this type
+
+e.g. 
+inductive Nat where
+  | zero : Nat
+  | succ : Nat → Nat
+
+we can construct zero:Nat and succ zero:Nat and so on
+
+we can do the same with propositions instead of types
+
+inductive Even : N → Prop where
+| zero : Even 0
+| add_two : ∀k : N, Even k → Even (k + 2)
+
+since propositions are types and proofs are terms,
+the existence of zero : Even 0 is proof of the proposition Even 0.
+likewise, due to add_two, we can show that add_two 0 : Even 2 is proof of the proposition Even 2.
+because of these construction rules, we can never construct a term of type Even 1,
+thus the type Even 1 is not inhabited, so it is false (no proof!)
