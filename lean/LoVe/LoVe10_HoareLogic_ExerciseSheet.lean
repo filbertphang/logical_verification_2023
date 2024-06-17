@@ -32,14 +32,40 @@ to be done. Use a `show` command to annotate the program with a loop invariant.
 Hint: If a variable `x` does not change in a program, it might be useful to
 record this in the invariant, by adding a conjunct `s "x" = x₀`. -/
 
+-- while_intro' :
+--   hS: establishes an invariant to be true for each iteration of the loop
+--   hP: proof that this invariant holds BEFORE the loop begins
+--   hQ: proof that if the loop ends and the invariant still holds, we will reach the end state
+
+-- it seems that we don't actually need to capture the "work already done" in the invariant,
+-- since the loop condition is strong enough to prove the postcondition that `s "b" = a₀`.
+-- it suffices to show that `a` remains unchanged throughout the loop
 theorem COUNT_UP_correct (a₀ : ℕ) :
   {* fun s ↦ s "a" = a₀ *} (COUNT_UP) {* fun s ↦ s "a" = a₀ ∧ s "b" = a₀ *} :=
-  sorry
+  PartialHoare.while_intro' (fun s ↦ (s "a" = a₀))
+  (
+    by
+      -- main idea: a is already a₀ before the loop happens, and only b gets updated
+      -- in the loop, so the value of a will never change
+      apply PartialHoare.assign_intro'
+      -- aesop works wonders here since we would otherwise have to do a lot of manual
+      -- State.update unrolling
+      aesop
+  )
+  (by aesop)
+  (by aesop)
 
 /- 1.2. What happens if the program is run with `b > a`? How is this captured
 by the Hoare triple? -/
 
--- enter your solution here
+/-
+if the program is run with `b > a`, then the loop will never terminate, since incrementing
+`b` will still never result in it becoming `a`.
+
+since we are only concerned with the notion of partial correctness, this hoare triple holds
+for this case, as we do not require the program to yield the stated postcondition if
+it does not terminate.
+-/
 
 /- 1.3. The following WHILE program is intended to compute the Gaussian sum up
 to `n`, leaving the result in `r`. -/
@@ -60,9 +86,33 @@ def sumUpTo : ℕ → ℕ
 /- Invoke `vcg` on `GAUSS` using a suitable loop invariant and prove the
 emerging verification conditions. -/
 
+-- i learnt the hard way that `vcg` doesn't expand functions like `GAUSS_inv`
+-- cue my frustration when i tried to use `vcg` on `GAUSS_inv` and it just kept failing
+def GAUSS_inv (N : ℕ) : Stmt :=
+  Stmt.invWhileDo (fun s ↦ true) (fun s ↦ s "n" ≠ N) (Stmt.assign "n" (fun s ↦ s "n" + 1); Stmt.assign "r" (fun s ↦ s "r" + s "n"))
+
 theorem GAUSS_correct (N : ℕ) :
   {* fun s ↦ True *} (GAUSS N) {* fun s ↦ s "r" = sumUpTo N *} :=
-  sorry
+  show {* fun s ↦ True *}
+  (Stmt.assign "r" (fun s ↦ 0);
+   Stmt.assign "n" (fun s ↦ 0);
+   Stmt.invWhileDo (fun s ↦ s "r" = sumUpTo (s "n"))
+    (fun s ↦ s "n" ≠ N)
+    (Stmt.assign "n" (fun s ↦ s "n" + 1);
+     Stmt.assign "r" (fun s ↦ s "r" + s "n")))
+  {* fun s ↦ s "r" = sumUpTo N *} from
+    by
+      vcg
+      {
+        -- case looks really complicated but that's just because of State.update
+        -- simplifying it, we can see that it's actually trivial
+        intro s h
+        simp [*]
+        rw [sumUpTo]
+        ac_rfl
+      }
+      {aesop}
+      {aesop}
 
 /- 1.4 (**optional**). The following program `MUL` is intended to compute the
 product of `n` and `m`, leaving the result in `r`. Invoke `vcg` on `MUL` using a
@@ -73,6 +123,7 @@ def MUL : Stmt :=
   Stmt.whileDo (fun s ↦ s "n" ≠ 0)
     (Stmt.assign "r" (fun s ↦ s "r" + s "m");
      Stmt.assign "n" (fun s ↦ s "n" - 1))
+
 
 theorem MUL_correct (n₀ m₀ : ℕ) :
   {* fun s ↦ s "n" = n₀ ∧ s "m" = m₀ *} (MUL) {* fun s ↦ s "r" = n₀ * m₀ *} :=
