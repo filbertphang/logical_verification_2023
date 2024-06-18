@@ -124,10 +124,44 @@ def MUL : Stmt :=
     (Stmt.assign "r" (fun s ↦ s "r" + s "m");
      Stmt.assign "n" (fun s ↦ s "n" - 1))
 
+def mulUpTo (m : ℕ) : ℕ → ℕ
+  | 0 => 0
+  | n + 1 => mulUpTo m n + m
 
 theorem MUL_correct (n₀ m₀ : ℕ) :
   {* fun s ↦ s "n" = n₀ ∧ s "m" = m₀ *} (MUL) {* fun s ↦ s "r" = n₀ * m₀ *} :=
-  sorry
+  show {* fun s ↦ s "n" = n₀ ∧ s "m" = m₀ *}
+  (Stmt.assign "r" (fun s ↦ 0);
+  Stmt.invWhileDo (fun s ↦ s "m" = m₀ ∧ s "r" = mulUpTo m₀ (n₀ - s "n"))
+    (fun s ↦ s "n" ≠ 0)
+    (Stmt.assign "r" (fun s ↦ s "r" + s "m");
+     Stmt.assign "n" (fun s ↦ s "n" - 1)))
+  {* fun s ↦ s "r" = n₀ * m₀ *} from
+  by
+    -- this is actually very doable
+    -- EXCEPT for the fact that we don't yet have basic math properties unlocked
+    -- so i can't even prove stuff like double negative = positive.
+    --
+    -- also,  simp/aesop doesn't have that registered yet, apparently.
+    --
+    -- i don't feel like proving the entire of Section IV of the book
+    -- from first principles, so i'm leaving this as-is for now
+    vcg <;> simp [*]
+    {
+      intro s sm_eq_m0 sr_val sn_non_zero
+      simp [*]
+      rw [← mulUpTo]
+      sorry
+    }
+    {
+      intro s sn_eq_0 sm_eq_m0 sr_val
+      rw [sr_val, sn_eq_0]
+      simp
+      sorry
+    }
+    { aesop }
+
+
 
 
 /- ## Question 2: Hoare Triples for Total Correctness
@@ -148,26 +182,68 @@ namespace TotalHoare
 theorem consequence {P P' Q Q' S}
     (hS : [* P *] (S) [* Q *]) (hP : ∀s, P' s → P s) (hQ : ∀s, Q s → Q' s) :
   [* P' *] (S) [* Q' *] :=
-  sorry
+  by
+    -- simplify equations
+    rw [TotalHoare] at *
+    intro s P's
+    -- show that such a state `t` exists, by using our hypotheses
+    have hT : ∃ t, (S, s) ⟹ t ∧ Q t :=
+      by
+        apply hS s
+        apply hP s
+        exact P's
+    -- instantiate `t` using `match`, and prove consequence
+    match hT with
+    | ⟨t, Ss_to_t, Qt⟩  =>
+      apply Exists.intro t
+      apply And.intro
+      {exact Ss_to_t}
+      {
+        apply hQ t
+        exact Qt
+      }
 
 /- 2.2. Prove the rule for `skip`. -/
 
 theorem skip_intro {P} :
   [* P *] (Stmt.skip) [* P *] :=
-  sorry
+  by
+    intro s Ps
+    apply Exists.intro s
+    apply And.intro
+    {aesop}
+    {exact Ps}
 
 /- 2.3. Prove the rule for `assign`. -/
 
 theorem assign_intro {P x a} :
   [* fun s ↦ P (s[x ↦ a s]) *] (Stmt.assign x a) [* P *] :=
-  sorry
+  by
+    intro s f
+    apply Exists.intro
+    {
+      -- construct an abitrary state where this holds
+      apply And.intro
+      { apply BigStep.assign }
+      { exact f }
+    }
 
 /- 2.4. Prove the rule for `seq`. -/
 
 theorem seq_intro {P Q R S T} (hS : [* P *] (S) [* Q *])
   (hT : [* Q *] (T) [* R *]) :
   [* P *] (S; T) [* R *] :=
-  sorry
+  fix s : State
+  fix Ps : P s
+
+  -- i only just discovered this syntax now
+  -- wtf this is so useful
+  -- i was constantly looking for a way to "instantiate" an existential hypothesis
+  have ⟨u, hU⟩ := hS s Ps
+  have ⟨t, hT'⟩ := hT u (And.right hU)
+  show _ from
+    -- we have established enough intermediate facts that we can proof using aesop
+    by aesop
 
 /- 2.5. Complete the proof of the rule for `if`–`then`–`else`.
 
@@ -177,7 +253,27 @@ theorem if_intro {B P Q S T}
     (hS : [* fun s ↦ P s ∧ B s *] (S) [* Q *])
     (hT : [* fun s ↦ P s ∧ ¬ B s *] (T) [* Q *]) :
   [* P *] (Stmt.ifThenElse B S T) [* Q *] :=
-  sorry
+  fix s : State
+  fix Ps : P s
+  have Bs_em : _ := Classical.em (B s)
+  show _ from
+    -- i could use aesop here directly but let's just write it out
+    by
+      simp at *
+      apply Or.elim Bs_em
+      {
+        intro Bs
+        have ⟨t, hT'⟩ := hS s (And.intro Ps Bs)
+        apply Exists.intro t
+        -- just a matter of deconstructing and reconstructing the proposition
+        -- using facts we already have
+        aesop
+      }
+      {
+        -- same idea as the `B s` case
+        aesop
+      }
+
 
 /- 2.6 (**optional**). Try to prove the rule for `while`.
 
